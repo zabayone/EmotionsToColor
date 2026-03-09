@@ -36,6 +36,7 @@ Oklab is a perceptually uniform colour space — equal numerical distances corre
 equal perceived colour differences. This guarantees smooth, artefact-free transitions 
 between emotional scenes and consistent rendering across devices.
 
+---
 
 ## How it works
 
@@ -131,6 +132,7 @@ based on the measured anchor gap between model output and theoretical target.
 This raises the Circumplex Pearson correlation from **0.28 → 0.72** without any
 additional training.
 
+---
 
 ## Results
 
@@ -153,7 +155,8 @@ Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend �
   The following image is an example generated on the 9 emotional classes taken into consideration:
   
 <img width="1297" height="1465" alt="examples" src="https://github.com/user-attachments/assets/b39d23ff-b87a-4c50-b2c4-d9eaa2cb728f" />
-  
+
+---
 
 ## Quickstart
 
