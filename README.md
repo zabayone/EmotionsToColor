@@ -149,32 +149,6 @@ Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend �
   correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
   less contrasted palettes.
 
-
-## Repo structure
-
-```
-text2palette/
-├── data/
-│   ├── raw/
-│   │   ├── colorhex_palettes_described.csv
-│   │   └── colorhunt_palettes.csv
-│   └── processed/
-│       ├── train.csv
-│       ├── val.csv
-│       └── test.csv
-├── config.py
-├── dataset.py
-├── model.py
-├── train.py
-├── merge_datasets.py
-├── inference.py
-├── evaluate.py
-├── requirements.txt
-└── .gitignore
-```
-
----
-
 ## Quickstart
 
 ```bash
