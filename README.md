@@ -59,6 +59,78 @@ The model is trained on ~35 000 colour palettes paired with text descriptions (L
 
 ---
 
+## Model & Training
+
+### Architecture
+
+Text2Palette uses a **two-stage architecture**:
+
+1. **CLIP ViT-B/32** (frozen) — encodes the text prompt into a 512-dimensional embedding.
+   CLIP was chosen over alternatives (e.g. Sentence-BERT) because it was trained on
+   image-text pairs, giving it a strong prior on the visual semantics of colour-related
+   language (*"warm sunset"*, *"cold winter"*, *"neon night"*).
+
+2. **Text2PaletteModel** — a lightweight MLP that maps the CLIP embedding to 5 colours
+   in Oklab space. The architecture consists of:
+   - A shared encoder (2 × Linear → GELU → LayerNorm → Dropout 0.1)
+   - Five independent colour heads (one per output colour), each predicting (L, a, b)
+
+   Output activations enforce valid Oklab ranges:
+   - L ∈ [0, 1] via **Sigmoid**
+   - a, b ∈ [−0.5, 0.5] via **Tanh × 0.5**
+
+The model has ~800K parameters and runs in < 5ms per inference on CPU.
+
+---
+
+### Training
+
+The model is trained end-to-end with a **composite loss** of three terms:
+
+L = L_huber + 0.3 · L_triplet + 1.0 · L_diversity + 0.5 · L_spread
+
+
+| Term | Role |
+|---|---|
+| **Huber** | Reconstruction — predicted palette close to ground truth |
+| **Triplet** | Ranking — palette of prompt A closer to its target than to prompt B's target |
+| **Diversity penalty** | Prevents colour collapse — pushes colours apart if closer than 0.12 |
+| **Lightness spread** | Forces L values to span [0.1, 0.9] evenly across the 5 colours |
+
+**Why Huber instead of MSE?**  
+Huber is less sensitive to outliers in colour space — some training palettes contain
+very dark or very saturated colours that would dominate a squared loss.
+
+**Why Triplet loss?**  
+It teaches the model *relative* semantics: the palette for *"happy"* should be closer
+to other happy palettes than to sad ones. This improves generalisation to unseen prompts
+without requiring explicit emotion labels during training.
+
+**Sample weighting:** tag-based palettes (ColorHunt) receive 4× weight relative to
+LLM-described palettes (ColorHex), reflecting higher confidence in their semantic labels.
+
+Training runs for 200 epochs with AdamW (lr=3e-4, cosine annealing to 1e-5)
+on ~28 000 training samples. On Apple M1 Max: ~24s/epoch.
+
+---
+
+### Emotional Anchor Blend
+
+The model is trained on generic colour-text pairs and has no explicit emotion supervision.
+To align output palettes with the 9 target emotion classes, a **post-hoc anchor blend**
+is applied at inference time:
+
+palette_final = (1 − α) · palette_model + α · anchor_class
+
+
+Anchor palettes are hand-crafted Oklab targets grounded in colour psychology and
+Russell's circumplex model of affect. The blend weight α is tuned per class (0.30–0.65)
+based on the measured anchor gap between model output and theoretical target.
+
+This raises the Circumplex Pearson correlation from **0.28 → 0.72** without any
+additional training.
+
+
 ## Results
 
 Evaluated on 9 emotion classes from Russell's circumplex model of affect.
