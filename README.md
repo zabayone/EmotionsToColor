@@ -87,8 +87,9 @@ The model has ~800K parameters and runs in < 5ms per inference on CPU.
 
 The model is trained end-to-end with a **composite loss** of three terms:
 
+```
 L = L_huber + 0.3 · L_triplet + 1.0 · L_diversity + 0.5 · L_spread
-
+```
 
 | Term | Role |
 |---|---|
@@ -120,9 +121,9 @@ The model is trained on generic colour-text pairs and has no explicit emotion su
 To align output palettes with the 9 target emotion classes, a **post-hoc anchor blend**
 is applied at inference time:
 
+```
 palette_final = (1 − α) · palette_model + α · anchor_class
-
-
+```
 Anchor palettes are hand-crafted Oklab targets grounded in colour psychology and
 Russell's circumplex model of affect. The blend weight α is tuned per class (0.30–0.65)
 based on the measured anchor gap between model output and theoretical target.
