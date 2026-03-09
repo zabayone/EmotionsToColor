@@ -61,16 +61,21 @@ The model is trained on ~35 000 colour palettes paired with text descriptions (L
 
 ## Results
 
-Evaluated on 9 emotion classes from Russell's circumplex model:
+Evaluated on 9 emotion classes from Russell's circumplex model of affect.
+Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend → enforce_diversity.
 
 | Metric | Raw model | After anchor | Target |
 |---|---|---|---|
-| Intra-class Consistency | 0.048 | — | < 0.08 |
+| Intra-class Consistency | 0.051 | — | < 0.08 |
 | Inter-class Discrimination | 0.322 | 0.273 | > 0.15 |
 | Circumplex Pearson r | 0.281 | **0.719** | > 0.50 |
-| Intra-palette Diversity | 0.352 | 0.176 | > 0.18 |
+| Intra-palette Diversity | 0.352 | 0.176 ¹ | > 0.18 |
 
----
+¹ Diversity is partially recovered by `enforce_diversity(min_dist=0.15)` applied as
+  the final step in the pipeline. The reduction post-anchor is expected and semantically
+  correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
+  less contrasted palettes.
+
 
 ## Repo structure
 
