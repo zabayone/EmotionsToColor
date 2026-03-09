@@ -149,6 +149,12 @@ Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend �
   correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
   less contrasted palettes.
 
+
+  The following image is an example generated on the 9 emotional classes taken into consideration:
+  
+<img width="1297" height="1465" alt="examples" src="https://github.com/user-attachments/assets/b39d23ff-b87a-4c50-b2c4-d9eaa2cb728f" />
+  
+
 ## Quickstart
 
 ```bash
