@@ -6,6 +6,37 @@ Built as part of a Master's thesis in Acoustic Engineering at Politecnico di Mil
 
 ---
 
+## Scope
+
+This project is part of my Master's thesis in Acoustic Engineering at Politecnico di Milano.
+
+The goal is to generate a VR environment driven by a **Music Emotion Recognition (MER)** model 
+that analyses piano performances using audio signals, motion tracking, and EMG data.
+The MER model classifies performances into 9 emotional states based on Russell's 
+circumplex model of affect:
+
+| Class | Description |
+|---|---|
+| Neutral | Emotional balance, absence of strong feelings |
+| Alert and excited | Heightened awareness, anticipation, energized |
+| Elated and happy | Intense joy and satisfaction, sense of fulfillment |
+| Contented and serene | Peaceful well-being, no immediate desires |
+| Relaxed and calm | Physical and mental ease, free from tension |
+| Melancholic and bored | Reflective sadness, lack of stimulation |
+| Sad and depressed | Deep unhappiness or despair |
+| Stressed and upset | Mental strain, frustration or discomfort |
+| Nervous and tense | Apprehension and unease, physical tension |
+
+The first stage of environment generation is **colour palette assignment**.
+This model generates perceptually coherent 5-colour palettes from emotion class labels
+and streams them to Unity via the **OSC protocol**.
+
+**Why Oklab?**  
+Oklab is a perceptually uniform colour space — equal numerical distances correspond to 
+equal perceived colour differences. This guarantees smooth, artefact-free transitions 
+between emotional scenes and consistent rendering across devices.
+
+
 ## How it works
 
 ```
@@ -111,6 +142,28 @@ Embeddings (`.npy`) are not included — they are computed automatically on firs
 See `requirements.txt` for the full list.
 
 ---
+
+## References & Credits
+
+**Colour space**
+- Björn Ottosson — [Oklab perceptual colour space](https://bottosson.github.io/posts/oklab/)
+- [`colour-science`](https://www.colour-science.org/) — Oklab conversion library
+
+**Embeddings**
+- OpenAI / LAION — [CLIP ViT-B/32](https://github.com/mlfoundations/open_clip)
+
+**Emotion model**
+- Russell, J. A. (1980). *A circumplex model of affect*. Journal of Personality and 
+  Social Psychology, 39(6), 1161–1178.
+
+**Datasets**
+- Colour palette data sourced from public online repositories,
+  preprocessed into Oklab coordinates and paired with text annotations.
+
+  **Related work**
+- Bahng et al. (2018). *Coloring with Words: Guiding Image Colorization 
+  Through Text-based Palette Generation.*
+  [Text2Colors](https://github.com/awesome-davian/Text2Colors) — ECCV 2018.
 
 ## License
 
