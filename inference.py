@@ -7,7 +7,8 @@ Pipeline:
     3. Emotional anchor blends the palette toward a class-specific target
        (based on Russell's circumplex model of affect)
     4. enforce_diversity pushes colours apart to guarantee visual variety
-    5. Oklab → sRGB → hex conversion for display
+    5. sort_palette_by_luminance orders colours dark → light for Unity indexing
+    6. Oklab → sRGB → hex conversion for display
 """
 
 import warnings
@@ -21,7 +22,12 @@ from model import Text2PaletteModel
 from config import DEVICE, DATA_DIR, EMBED_DIM
 
 # ── Constants ─────────────────────────────────────────────────────
-T_SCALED = 0.05 / (EMBED_DIM ** 0.5)   # temperature scaled to embedding norm
+# Temperature for embedding-space noise.  Scaled to embedding dimension so
+# that the expected angular deviation on the unit sphere stays constant
+# regardless of model size.  0.25 / √512 ≈ 0.011 → ~14° rotation, which
+# gives perceptibly different palettes across runs while remaining
+# semantically coherent (same emotion class).
+T_SCALED = 0.25 / (EMBED_DIM ** 0.5)   # temperature scaled to embedding norm
 
 
 # ── Emotional anchors (Russell circumplex) ────────────────────────
@@ -117,6 +123,18 @@ def enforce_diversity(palette: np.ndarray, min_dist: float = 0.15) -> np.ndarray
     return p
 
 
+def sort_palette_by_luminance(palette: np.ndarray) -> np.ndarray:
+    """
+    Sorts the 5 colours by Oklab L channel, darkest → lightest.
+
+    Consistent ordering lets downstream consumers (e.g. Unity shaders) address
+    palette slots by perceived brightness:
+        index 0 = darkest  (shadows / background)
+        index 4 = lightest (highlights / foreground)
+    """
+    return palette[np.argsort(palette[:, 0])]
+
+
 def oklab_to_hex(L: float, a: float, b: float) -> str:
     """Converts a single Oklab colour to a lowercase hex string."""
     l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
@@ -171,6 +189,7 @@ def generate(prompt: str, model, clip_model, tokenizer,
 
     palette = apply_anchor(palette, prompt)
     palette = enforce_diversity(palette)
+    palette = sort_palette_by_luminance(palette)
     return [oklab_to_hex(*color) for color in palette]
 
 
