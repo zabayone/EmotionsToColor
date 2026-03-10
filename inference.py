@@ -19,7 +19,7 @@ import numpy as np
 import open_clip
 
 from model import Text2PaletteModel
-from config import DEVICE, DATA_DIR, EMBED_DIM
+from config import DEVICE, DATA_DIR, EMBED_DIM, ANCHOR_SCALE
 
 # ── Constants ─────────────────────────────────────────────────────
 # Temperature for embedding-space noise.  Scaled to embedding dimension so
@@ -33,6 +33,7 @@ T_SCALED = 0.25 / (EMBED_DIM ** 0.5)   # temperature scaled to embedding norm
 # ── Emotional anchors (Russell circumplex) ────────────────────────
 # Each anchor is a (5, 3) array of target Oklab colours for that emotion class.
 # Blend weight (alpha) is tuned per class based on model anchor-gap analysis.
+# ANCHOR_SCALE (imported from config) is applied globally to all weights.
 
 EMOTIONAL_ANCHORS: dict[str, tuple[np.ndarray, float]] = {
     "neutral": (np.array([
@@ -99,7 +100,8 @@ def apply_anchor(palette: np.ndarray, prompt: str) -> np.ndarray:
     if best_key is None:
         return palette
     anchor, alpha = EMOTIONAL_ANCHORS[best_key]
-    return (1 - alpha) * palette + alpha * anchor
+    effective_alpha = ANCHOR_SCALE * alpha
+    return (1 - effective_alpha) * palette + effective_alpha * anchor
 
 
 def enforce_diversity(palette: np.ndarray, min_dist: float = 0.15) -> np.ndarray:
