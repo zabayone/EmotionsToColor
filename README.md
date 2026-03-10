@@ -192,47 +192,7 @@ Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend �
   the final step in the pipeline. The reduction post-anchor is expected and semantically
   correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
   less contrasted palettes.
-
-### Unbiased Analysis
-
-The results should be interpreted carefully:
-
-**Strengths**
-- The post-anchor Circumplex correlation (r = 0.719) and inter-class discrimination (0.273)
-  are solid results for the intended VR use-case: the system reliably separates emotional
-  classes with perceptually meaningful colour differences.
-- The model is extremely lightweight (~800 K parameters, < 5 ms inference) and suitable for
-  real-time integration in a VR pipeline.
-- The Oklab colour space choice is well-motivated and leads to smooth, artefact-free
-  transitions between emotion scenes.
-
-**Limitations**
-- **Most of the emotional alignment is rule-based, not learned.**  
-  The raw Circumplex correlation is only 0.281 (barely above chance level for 9 classes),
-  meaning the MLP itself has not learned a strong mapping from text to emotion-coherent
-  colours. The jump to 0.719 is entirely due to the hand-crafted anchor blend (α = 0.30–0.65).
-  The system is therefore better described as *anchor-corrected regression* than as
-  *generative emotional colour synthesis*.
-- **Post-anchor diversity falls below the 0.18 target (0.176).**  
-  While `enforce_diversity` partially recovers spread, the strong anchor pull creates palettes
-  that are visually homogeneous for some classes (most notably *sad and depressed* and
-  *neutral*). For applications requiring high within-palette contrast this is a real
-  limitation.
-- **High anchor blend weights reduce the model's contribution.**  
-  For five of the nine classes α ≥ 0.60, meaning the neural output contributes only 40 % or
-  less to the final palette. This limits the system's ability to generalise to novel or
-  mixed-emotion prompts that fall outside the nine predefined classes.
-- **No perceptual user study.**  
-  All metrics are computed numerically; there is no human evaluation confirming that the
-  generated palettes feel emotionally correct to actual observers.
-
-**Overall verdict**  
-The pipeline achieves its stated goal of colour-palette assignment for a fixed 9-class
-emotion taxonomy and is well-suited for the VR thesis project. However, the headline
-circumplex number (r = 0.72) should not be read as evidence of a powerful learned
-emotion→colour model; it reflects a hybrid system where the ML model provides a
-reasonable prior and hand-crafted anchors do the heavy lifting for emotional accuracy.
-
+  
 ---
 
   The following image is an example generated on the 9 emotional classes taken into consideration:
