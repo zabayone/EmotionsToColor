@@ -21,6 +21,7 @@ from itertools import combinations
 
 from model import Text2PaletteModel
 from config import DEVICE, DATA_DIR, EMBED_DIM, ANCHOR_SCALE
+from inference import enrich_prompt
 
 # ── Emotion classes ───────────────────────────────────────────────
 # Prompts are enriched with synonyms to reduce CLIP embedding variance.
@@ -52,20 +53,20 @@ CIRCUMPLEX: dict[str, tuple[float, float]] = {
 # Theoretical Oklab anchors — (5, 3) array per class
 EMOTIONAL_ANCHORS: dict[str, np.ndarray] = {
     "neutral": np.array([
-        ( 0.55,  0.00,  0.00), ( 0.60,  0.01, -0.01),
-        ( 0.50, -0.01,  0.01), ( 0.58,  0.00,  0.02), ( 0.52,  0.01, -0.02),
+        ( 0.5139, -0.0055, -0.0214), ( 0.5783, -0.0068, -0.0196),
+        ( 0.6715, -0.0073, -0.0207), ( 0.7552, -0.0075, -0.0187), ( 0.8467, -0.0066, -0.0165),
     ], dtype=np.float32),
     "alert and excited": np.array([
-        ( 0.75,  0.15,  0.12), ( 0.85,  0.18,  0.15),
-        ( 0.65,  0.20,  0.10), ( 0.90,  0.12,  0.18), ( 0.70,  0.22,  0.08),
+        ( 0.6839,  0.1718,  0.1152), ( 0.7236,  0.1228,  0.1407),
+        ( 0.8124,  0.0401,  0.1655), ( 0.6541,  0.2035,  0.1120), ( 0.8803,  0.0092,  0.1344),
     ], dtype=np.float32),
     "elated and happy": np.array([
-        ( 0.88,  0.10,  0.16), ( 0.80,  0.12,  0.18),
-        ( 0.92,  0.08,  0.12), ( 0.75,  0.14,  0.20), ( 0.85,  0.09,  0.14),
+        ( 0.8916, -0.0082,  0.1566), ( 0.8403,  0.0178,  0.1715),
+        ( 0.9240, -0.0079,  0.1143), ( 0.7828,  0.0678,  0.1537), ( 0.8851,  0.0089,  0.1287),
     ], dtype=np.float32),
     "contented and serene": np.array([
-        ( 0.78,  0.05,  0.10), ( 0.82,  0.04,  0.08),
-        ( 0.72,  0.06,  0.12), ( 0.85,  0.03,  0.07), ( 0.76,  0.05,  0.09),
+        ( 0.8082, -0.0864,  0.0018), ( 0.8719, -0.0628, -0.0025),
+        ( 0.9163, -0.0382, -0.0241), ( 0.8005, -0.0465, -0.0620), ( 0.7427, -0.0551, -0.0681),
     ], dtype=np.float32),
     "relaxed and calm": np.array([
         ( 0.68, -0.04, -0.08), ( 0.74, -0.03, -0.06),
@@ -80,26 +81,26 @@ EMOTIONAL_ANCHORS: dict[str, np.ndarray] = {
         ( 0.35, -0.05, -0.12), ( 0.18, -0.02, -0.18), ( 0.32, -0.04, -0.15),
     ], dtype=np.float32),
     "stressed and upset": np.array([
-        ( 0.45,  0.20,  0.08), ( 0.35,  0.24,  0.06),
-        ( 0.55,  0.16,  0.10), ( 0.30,  0.22,  0.04), ( 0.50,  0.18,  0.12),
+        ( 0.4225,  0.1346,  0.0673), ( 0.5386,  0.1731,  0.0871),
+        ( 0.6083,  0.1862,  0.0949), ( 0.7045,  0.1492,  0.1217), ( 0.3141,  0.1009,  0.0435),
     ], dtype=np.float32),
     "nervous and tense": np.array([
-        ( 0.40,  0.08, -0.14), ( 0.32,  0.06, -0.16),
-        ( 0.48,  0.10, -0.12), ( 0.28,  0.05, -0.18), ( 0.44,  0.09, -0.10),
+        ( 0.3763,  0.0379, -0.1477), ( 0.4853,  0.0435, -0.1511),
+        ( 0.5544, -0.0151, -0.1751), ( 0.6618,  0.0483, -0.1815), ( 0.2923,  0.0080, -0.0987),
     ], dtype=np.float32),
 }
 
 # Alpha values per class (tuned from anchor-gap analysis)
 ANCHOR_ALPHA: dict[str, float] = {
-    "neutral":               0.30,
+    "neutral":               0.25,
     "alert and excited":     0.50,
-    "elated and happy":      0.50,
-    "contented and serene":  0.45,
-    "relaxed and calm":      0.45,
-    "melancholic and bored": 0.60,
-    "sad and depressed":     0.65,
-    "stressed and upset":    0.60,
-    "nervous and tense":     0.60,
+    "elated and happy":      0.45,
+    "contented and serene":  0.40,
+    "relaxed and calm":      0.35,
+    "melancholic and bored": 0.45,
+    "sad and depressed":     0.60,
+    "stressed and upset":    0.45,
+    "nervous and tense":     0.45,
 }
 
 # Global scaling factor applied to all per-class anchor blend weights.
@@ -120,11 +121,24 @@ model.eval()
 
 # ── Helpers ───────────────────────────────────────────────────────
 
+COLOR_ENRICHMENT_WEIGHT: float = 0.25  # must match inference.py default
+
+
 def generate(prompt: str, temperature: float = 0.0) -> np.ndarray:
-    tokens = tokenizer([prompt]).to(DEVICE)
     with torch.no_grad():
-        emb = clip_model.encode_text(tokens).float()
+        tokens_plain = tokenizer([prompt]).to(DEVICE)
+        emb = clip_model.encode_text(tokens_plain).float()
         emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)
+
+        if COLOR_ENRICHMENT_WEIGHT > 0:
+            enriched = enrich_prompt(prompt)
+            if enriched != prompt:
+                tokens_rich = tokenizer([enriched]).to(DEVICE)
+                emb_rich = clip_model.encode_text(tokens_rich).float()
+                emb_rich = emb_rich / (emb_rich.norm(dim=-1, keepdim=True) + 1e-8)
+                emb = (1 - COLOR_ENRICHMENT_WEIGHT) * emb + COLOR_ENRICHMENT_WEIGHT * emb_rich
+                emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)
+
         if temperature > 0:
             emb = emb + torch.randn_like(emb) * temperature
             emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)

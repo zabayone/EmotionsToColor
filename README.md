@@ -43,6 +43,9 @@ between emotional scenes and consistent rendering across devices.
 ```
 Text prompt
     │
+    ├─ plain CLIP encoding ──────────────────────────────┐
+    └─ + colour descriptor → enriched CLIP encoding ─── interpolate (w=0.25) → re-normalise
+    │
     ▼
 CLIP ViT-B/32 (OpenAI)   →  512-dim embedding
     │
@@ -132,11 +135,58 @@ is applied at inference time:
 palette_final = (1 − s·α) · palette_model + s·α · anchor_class
 ```
 Anchor palettes are hand-crafted Oklab targets grounded in colour psychology and
-Russell's circumplex model of affect. The blend weight α is tuned per class (0.30–0.65),
+Russell's circumplex model of affect. The blend weight α is tuned per class (0.25–0.60),
 and a global scale factor **s = 0.3** is applied to all weights, giving effective blend
-strengths in the range **0.09–0.20**. The reduced scaling preserves more of the raw model
-output, increasing palette variation while retaining emotional coherence. Circumplex
-alignment is partially traded for variation; re-run `evaluate.py` for current metrics.
+strengths in the range **0.075–0.18**. This keeps the pipeline predominantly model-based
+while nudging palettes toward the intended affective region instead of replacing the
+model output with anchor-dominated colours. Re-run `evaluate.py` for current metrics.
+
+The current anchor set was revised to better match the intended colour semantics:
+
+| Class | Anchor direction |
+|---|---|
+| Neutral | cooler blue-gray neutrals instead of warm greige |
+| Alert and excited | cleaner orange-red-yellow high-energy hues |
+| Elated and happy | brighter yellow / golden tones, less amber-heavy |
+| Contented and serene | aqua / sky / seafoam tones instead of warm beige |
+| Stressed and upset | red-led palette with stronger urgency cues |
+| Nervous and tense | colder violet-blue tension cues with more contrast |
+
+These anchor revisions improve semantic alignment, but the side-by-side comparison
+still shows a warm bias in the raw model output for several classes. That bias is only
+partially corrected by the current blend strengths, because raising α further would
+make the output anchor-dominated rather than model-generated.
+
+### Prompt Colour Enrichment
+
+To further close the gap between the model's generic colour prior and the intended
+affective zone, the inference pipeline applies a **colour-hint interpolation** at the
+embedding level before the model forward pass:
+
+```python
+# colour_enrichment_weight = 0.25 (default)
+emb = (1 - w) * emb_plain + w * emb_enriched
+emb = emb / emb.norm(dim=-1, keepdim=True)
+```
+
+For each emotion class a short natural-language colour descriptor is appended to the
+prompt and encoded separately by CLIP. The two normalised embeddings are then
+interpolated at weight `w = 0.25` — giving 75% of the signal to the original semantic
+prompt and 25% to the colour hint — and the result is re-normalised before being fed
+to the palette model.
+
+This technique compensates for the fact that the model was not trained with emotion
+labels and therefore has no intrinsic concept of which colours map to which affective
+states. The colour hint steers the CLIP embedding toward the correct chromatic zone,
+but because the model itself has not learned emotion-to-colour associations, the hint
+also reduces embedding variance and therefore palette diversity. The improvements in
+discrimination metrics are largely attributable to this steering, not to the model's
+learned representations.
+
+The weight `w` is configurable per call (`color_enrichment_weight` argument to
+`generate()`). For free-form prompts that do not match any emotion class the enriched
+embedding is not used (`w` effectively becomes `0`), so behaviour for open-ended prompts
+is unchanged from the baseline.
 
 ---
 
@@ -175,29 +225,83 @@ by `evaluate.py`).
 ## Results
 
 Evaluated on 9 emotion classes from Russell's circumplex model of affect.
-Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend → enforce_diversity → sort_palette_by_luminance.
+Full pipeline: colour-hint embedding interpolation (`w = 0.25`) → CLIP ViT-B/32 → Text2PaletteModel → emotional anchor blend → enforce_diversity → sort_palette_by_luminance.
+
+Current metrics below were obtained with **emotional anchor scaling** enabled
+(`s = 0.3`) and **prompt colour enrichment** (`w = 0.25`), using `N = 10` stochastic
+samples for the intra-class consistency check and deterministic inference
+(`temperature = 0`) for inter-class, circumplex, and diversity evaluation.
 
 | Metric | Raw model | After anchor | Target |
 |---|---|---|---|
-| Intra-class Consistency | 0.051 | — | < 0.08 |
-| Inter-class Discrimination | 0.322 | 0.273 | > 0.15 |
-| Circumplex Pearson r | 0.281 | **0.719** | > 0.50 |
-| Intra-palette Diversity | 0.352 | 0.176 ¹ | > 0.18 |
+| Intra-class Consistency | 0.0117 | unchanged | < 0.08 |
+| Inter-class Discrimination | 0.2257 | 0.2294 | > 0.15 |
+| Circumplex Pearson r | 0.5913 | **0.6417** | > 0.50 |
+| Intra-palette Diversity | 0.3371 | 0.2930 | > 0.18 |
+| Mean Anchor Gap to Theoretical Anchor | 0.2833 | 0.2459 | lower is better |
 
-> **Note — consistency metric uses `T = 0.05 / √512 ≈ 0.002`** (evaluation temperature).
+> **Note — consistency metric uses `T = 0.05 / √512 ≈ 0.0022`** (evaluation temperature).
 > Interactive inference uses the higher default `T = 0.25 / √512 ≈ 0.011`, which gives
 > perceptibly different palettes across runs (~14° angular deviation on the embedding sphere).
 
-¹ Diversity is partially recovered by `enforce_diversity(min_dist=0.15)` applied as
-  the final step in the pipeline. The reduction post-anchor is expected and semantically
-  correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
-  less contrasted palettes.
+All numeric targets are met, but the interpretation requires care:
+
+- **Discrimination** rises from `0.1495` (without enrichment) to `0.2257` with colour-enriched prompts. This improvement comes from steering the CLIP embedding *before* model inference, not from the palette model learning emotion-to-colour associations.
+- **Circumplex r = 0.6417** indicates a moderate positive correlation between palette distances and Russell circumplex distances — classes that are far apart emotionally tend to produce more distinct palettes, but the relationship is not strong. Pairs such as `neutral ↔ nervous and tense` (`0.0633`) and `sad ↔ nervous` (`0.0657`) remain poorly separated despite being semantically distant.
+- **Consistency (0.0117)** is partly a consequence of the enrichment reducing embedding variance, not only model quality per se.
+- **Mean anchor gap (0.2459)** remains substantial after blending. This reflects the inherent limitation of a low-weight post-processing step: at effective blend strengths of 0.075–0.18 the palette cannot deviate far from the raw model output.
+- **Diversity** drops from `0.3371` to `0.2930` after anchor blending, as expected — blending five colours toward a common anchor reduces their spread.
+
+The closest inter-class pairs after blending are `contented and serene ↔ relaxed and calm`
+(`0.0453`), `neutral ↔ nervous and tense` (`0.0633`), `sad and depressed ↔ nervous and tense`
+(`0.0657`), and `melancholic and bored ↔ sad and depressed` (`0.0858`). The first and last
+pairs are semantically adjacent in the circumplex, so low palette distance is expected.
+The middle two are semantically distant and represent the main unresolved ambiguities.
+
+The comparison between raw model output, theoretical anchors, and final blended palettes
+can be regenerated locally with `python generate_anchor_comparison.py`.
+
+<img width="1600" alt="anchor comparison" src="data/anchor_comparison.png" />
   
 ---
 
-  The following image is an example generated on the 9 emotional classes taken into consideration:
+## Limitations
+
+The palette model was trained on generic colour-text pairs with no explicit emotion
+supervision. The training objective — reconstructing palettes from their text descriptions
+— does not teach the model which emotional states correspond to which chromatic regions.
+As a result, the raw model output has a warm/olive bias across several emotion classes
+(neutral, alert, stressed, nervous), and both the anchor blend and the prompt enrichment
+are compensating corrections rather than properties learned by the model.
+
+Key limitations of the current approach:
+
+- **No end-to-end emotion learning.** The model cannot generalise to free-form prompts that
+  express emotion indirectly (e.g. *"a panic attack"*, *"bitter resignation"*). Anchor
+  matching relies on word overlap; mismatched or unrecognised prompts receive no chromatic
+  correction.
+- **Anchor blend has limited correction power.** Effective blend strengths of 0.075–0.18
+  are insufficient to fully override the raw model's warm bias. Higher values would produce
+  anchor-dominated palettes indistinguishable from the hand-crafted targets.
+- **Metric improvements are partially artefactual.** The discrimination improvement from
+  `0.1495` to `0.2257` is driven by the colour-hint embedding interpolation, which directly
+  encodes chromatic information into the CLIP input — not by the model's internal
+  representations.
+- **Nearest-pair ambiguities persist.** `neutral ↔ nervous and tense` remain perceptually
+  close (`0.0633`) despite being semantically distant in the Russell circumplex. This is a
+  structural failure that post-hoc corrections cannot fully resolve.
+
+The most direct path to higher quality would be fine-tuning with explicit emotion supervision
+— for example, a triplet loss that pulls palettes of the same emotion class together and
+pushes palettes of distant classes apart — or training on a purpose-built emotion-annotated
+colour dataset.
   
-<img width="1297" height="1465" alt="examples" src="https://github.com/user-attachments/assets/b39d23ff-b87a-4c50-b2c4-d9eaa2cb728f" />
+---
+
+  The following image is an example generated on the 9 emotional classes taken into consideration.
+  It can be regenerated locally with `python generate_readme_example.py`.
+  
+<img width="862" height="1018" alt="examples" src="data/readme_example.png" />
 
 ---
 

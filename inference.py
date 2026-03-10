@@ -37,50 +37,89 @@ T_SCALED = 0.25 / (EMBED_DIM ** 0.5)   # temperature scaled to embedding norm
 
 EMOTIONAL_ANCHORS: dict[str, tuple[np.ndarray, float]] = {
     "neutral": (np.array([
-        (0.55,  0.00,  0.00), (0.60,  0.01, -0.01),
-        (0.50, -0.01,  0.01), (0.58,  0.00,  0.02), (0.52,  0.01, -0.02),
-    ], dtype=np.float32), 0.30),
+        (0.5139, -0.0055, -0.0214), (0.5783, -0.0068, -0.0196),
+        (0.6715, -0.0073, -0.0207), (0.7552, -0.0075, -0.0187), (0.8467, -0.0066, -0.0165),
+    ], dtype=np.float32), 0.25),
 
     "alert and excited": (np.array([
-        (0.75,  0.15,  0.12), (0.85,  0.18,  0.15),
-        (0.65,  0.20,  0.10), (0.90,  0.12,  0.18), (0.70,  0.22,  0.08),
+        (0.6839,  0.1718,  0.1152), (0.7236,  0.1228,  0.1407),
+        (0.8124,  0.0401,  0.1655), (0.6541,  0.2035,  0.1120), (0.8803,  0.0092,  0.1344),
     ], dtype=np.float32), 0.50),
 
     "elated and happy": (np.array([
-        (0.88,  0.10,  0.16), (0.80,  0.12,  0.18),
-        (0.92,  0.08,  0.12), (0.75,  0.14,  0.20), (0.85,  0.09,  0.14),
-    ], dtype=np.float32), 0.50),
+        (0.8916, -0.0082,  0.1566), (0.8403,  0.0178,  0.1715),
+        (0.9240, -0.0079,  0.1143), (0.7828,  0.0678,  0.1537), (0.8851,  0.0089,  0.1287),
+    ], dtype=np.float32), 0.45),
 
     "contented and serene": (np.array([
-        (0.78,  0.05,  0.10), (0.82,  0.04,  0.08),
-        (0.72,  0.06,  0.12), (0.85,  0.03,  0.07), (0.76,  0.05,  0.09),
-    ], dtype=np.float32), 0.45),
+        (0.8082, -0.0864,  0.0018), (0.8719, -0.0628, -0.0025),
+        (0.9163, -0.0382, -0.0241), (0.8005, -0.0465, -0.0620), (0.7427, -0.0551, -0.0681),
+    ], dtype=np.float32), 0.40),
 
     "relaxed and calm": (np.array([
         (0.68, -0.04, -0.08), (0.74, -0.03, -0.06),
         (0.62, -0.05, -0.10), (0.78, -0.02, -0.05), (0.65, -0.04, -0.09),
-    ], dtype=np.float32), 0.45),
+    ], dtype=np.float32), 0.35),
 
     "melancholic and bored": (np.array([
         (0.48, -0.03, -0.10), (0.42, -0.02, -0.08),
         (0.55, -0.04, -0.06), (0.38, -0.01, -0.12), (0.52, -0.03, -0.07),
-    ], dtype=np.float32), 0.60),
+    ], dtype=np.float32), 0.45),
 
     "sad and depressed": (np.array([
         (0.28, -0.04, -0.16), (0.22, -0.03, -0.14),
         (0.35, -0.05, -0.12), (0.18, -0.02, -0.18), (0.32, -0.04, -0.15),
-    ], dtype=np.float32), 0.65),
+    ], dtype=np.float32), 0.60),
 
     "stressed and upset": (np.array([
-        (0.45,  0.20,  0.08), (0.35,  0.24,  0.06),
-        (0.55,  0.16,  0.10), (0.30,  0.22,  0.04), (0.50,  0.18,  0.12),
-    ], dtype=np.float32), 0.60),
+        (0.4225,  0.1346,  0.0673), (0.5386,  0.1731,  0.0871),
+        (0.6083,  0.1862,  0.0949), (0.7045,  0.1492,  0.1217), (0.3141,  0.1009,  0.0435),
+    ], dtype=np.float32), 0.45),
 
     "nervous and tense": (np.array([
-        (0.40,  0.08, -0.14), (0.32,  0.06, -0.16),
-        (0.48,  0.10, -0.12), (0.28,  0.05, -0.18), (0.44,  0.09, -0.10),
-    ], dtype=np.float32), 0.60),
+        (0.3763,  0.0379, -0.1477), (0.4853,  0.0435, -0.1511),
+        (0.5544, -0.0151, -0.1751), (0.6618,  0.0483, -0.1815), (0.2923,  0.0080, -0.0987),
+    ], dtype=np.float32), 0.45),
 }
+
+# ── Prompt colour enrichment ──────────────────────────────────────
+# Natural-language colour descriptors appended to the CLIP input to steer the
+# embedding toward the correct chromatic zone *before* model inference, rather
+# than relying solely on post-hoc anchor blending.
+# The original prompt label is kept for anchor-key matching; only the CLIP
+# encoding sees the extended version.
+
+PROMPT_COLOR_DESCRIPTIONS: dict[str, str] = {
+    "neutral":                "muted gray-blue, cool balanced tones, neutral palette",
+    "alert and excited":      "vivid orange-red, warm energetic hues, saturated amber",
+    "elated and happy":       "bright sunny yellow, cheerful golden light, warm luminous",
+    "contented and serene":   "soft aqua seafoam, calm sky blue, fresh cool teal",
+    "relaxed and calm":       "gentle cool blue, soothing soft tones, quiet periwinkle",
+    "melancholic and bored":  "dull muted violet, pale gray-lavender, desaturated cool",
+    "sad and depressed":      "dark navy blue, deep cold indigo, heavy dark shadows",
+    "stressed and upset":     "dark crimson red, intense deep red, tense saturated",
+    "nervous and tense":      "cold electric violet-blue, deep indigo, tense dark",
+}
+
+
+def enrich_prompt(prompt: str) -> str:
+    """
+    Returns a colour-enriched version of the prompt for CLIP encoding.
+    Matches *prompt* against EMOTIONAL_ANCHORS keys by shared-word overlap
+    (same strategy as apply_anchor).  If a match is found the corresponding
+    colour descriptor from PROMPT_COLOR_DESCRIPTIONS is appended.
+    Falls back to the original prompt for free-form inputs.
+    """
+    prompt_words = set(prompt.lower().split())
+    best_key, best_score = None, 0
+    for key in EMOTIONAL_ANCHORS:
+        score = len(set(key.split()) & prompt_words)
+        if score > best_score:
+            best_score, best_key = score, key
+    if best_key is None or best_score == 0:
+        return prompt
+    descriptor = PROMPT_COLOR_DESCRIPTIONS.get(best_key, "")
+    return f"{prompt}, {descriptor}" if descriptor else prompt
 
 
 # ── Post-processing ───────────────────────────────────────────────
@@ -178,12 +217,37 @@ def load_models():
 
 
 def generate(prompt: str, model, clip_model, tokenizer,
-             temperature: float = T_SCALED) -> list[str]:
-    """Full pipeline: CLIP → model → anchor → diversity → hex."""
-    tokens = tokenizer([prompt]).to(DEVICE)
+             temperature: float = T_SCALED,
+             color_enrichment_weight: float = 0.25) -> list[str]:
+    """Full pipeline: CLIP → model → anchor → diversity → hex.
+
+    Args:
+        prompt: Emotion description (e.g. "sad and depressed").
+        temperature: Noise added to the CLIP embedding for palette variety.
+        color_enrichment_weight: Interpolation weight in [0, 1] between the
+            plain embedding (0) and the colour-enriched embedding (1).
+            At 0 the colour hints are ignored entirely; at 1 the enriched
+            prompt fully replaces the original.  Default 0.25 gives a subtle
+            chromatic nudge while preserving emotion semantics.
+    """
     with torch.no_grad():
-        emb = clip_model.encode_text(tokens).float()
-        emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)
+        tokens_plain = tokenizer([prompt]).to(DEVICE)
+        emb_plain = clip_model.encode_text(tokens_plain).float()
+        emb_plain = emb_plain / (emb_plain.norm(dim=-1, keepdim=True) + 1e-8)
+
+        if color_enrichment_weight > 0:
+            enriched = enrich_prompt(prompt)
+            if enriched != prompt:
+                tokens_rich = tokenizer([enriched]).to(DEVICE)
+                emb_rich = clip_model.encode_text(tokens_rich).float()
+                emb_rich = emb_rich / (emb_rich.norm(dim=-1, keepdim=True) + 1e-8)
+                emb = (1 - color_enrichment_weight) * emb_plain + color_enrichment_weight * emb_rich
+                emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)
+            else:
+                emb = emb_plain
+        else:
+            emb = emb_plain
+
         if temperature > 0:
             emb = emb + torch.randn_like(emb) * temperature
             emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)

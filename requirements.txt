@@ -9,3 +9,6 @@ open_clip_torch>=2.20
 
 # Colour space conversion
 colour-science>=0.4
+
+# README/example rendering
+Pillow>=11.0
