@@ -30,6 +30,12 @@ COLOR_DIM  = 3     # Oklab: (L, a, b)
 # Flat list of Oklab column names: L0,a0,b0 … L4,a4,b4
 OKLAB_COLS = [f"{c}{i}" for i in range(N_COLORS) for c in ("L", "a", "b")]
 
+# ── Emotional anchor blend ────────────────────────────────────────
+# Global scaling factor applied to all per-class anchor blend weights.
+# A value of 0.3 preserves emotional coherence while allowing more variation
+# from the raw model output — confirmed by empirical evaluation.
+ANCHOR_SCALE: float = 0.3
+
 # ── Training ──────────────────────────────────────────────────────
 BATCH_SIZE = 256
 EPOCHS     = 200

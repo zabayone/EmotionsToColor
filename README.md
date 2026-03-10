@@ -129,14 +129,14 @@ To align output palettes with the 9 target emotion classes, a **post-hoc anchor 
 is applied at inference time:
 
 ```
-palette_final = (1 − α) · palette_model + α · anchor_class
+palette_final = (1 − s·α) · palette_model + s·α · anchor_class
 ```
 Anchor palettes are hand-crafted Oklab targets grounded in colour psychology and
-Russell's circumplex model of affect. The blend weight α is tuned per class (0.30–0.65)
-based on the measured anchor gap between model output and theoretical target.
-
-This raises the Circumplex Pearson correlation from **0.28 → 0.72** without any
-additional training.
+Russell's circumplex model of affect. The blend weight α is tuned per class (0.30–0.65),
+and a global scale factor **s = 0.3** is applied to all weights, giving effective blend
+strengths in the range **0.09–0.20**. The reduced scaling preserves more of the raw model
+output, increasing palette variation while retaining emotional coherence. Circumplex
+alignment is partially traded for variation; re-run `evaluate.py` for current metrics.
 
 ---
 

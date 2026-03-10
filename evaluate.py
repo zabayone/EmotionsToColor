@@ -20,7 +20,7 @@ import open_clip
 from itertools import combinations
 
 from model import Text2PaletteModel
-from config import DEVICE, DATA_DIR, EMBED_DIM
+from config import DEVICE, DATA_DIR, EMBED_DIM, ANCHOR_SCALE
 
 # ── Emotion classes ───────────────────────────────────────────────
 # Prompts are enriched with synonyms to reduce CLIP embedding variance.
@@ -102,6 +102,9 @@ ANCHOR_ALPHA: dict[str, float] = {
     "nervous and tense":     0.60,
 }
 
+# Global scaling factor applied to all per-class anchor blend weights.
+# Imported from config — single source of truth.
+
 T_SCALED = 0.05 / (EMBED_DIM ** 0.5)
 N_RUNS   = 10
 
@@ -138,7 +141,8 @@ def circumplex_dist(c1: tuple, c2: tuple) -> float:
 
 def apply_anchor(palette: np.ndarray, cls: str) -> np.ndarray:
     alpha = ANCHOR_ALPHA.get(cls, 0.55)
-    return (1 - alpha) * palette + alpha * EMOTIONAL_ANCHORS[cls]
+    effective_alpha = ANCHOR_SCALE * alpha
+    return (1 - effective_alpha) * palette + effective_alpha * EMOTIONAL_ANCHORS[cls]
 
 
 # ── Pre-compute base palettes ─────────────────────────────────────
