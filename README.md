@@ -53,7 +53,13 @@ Text2PaletteModel         →  5 × Oklab (L, a, b)
 Emotional anchor blend    →  circumplex-aligned palette
     │
     ▼
-enforce_diversity          →  final palette (hex)
+enforce_diversity          →  spread colours apart
+    │
+    ▼
+sort_palette_by_luminance  →  darkest → lightest (Unity-ready)
+    │
+    ▼
+oklab_to_hex               →  final palette (#rrggbb × 5)
 ```
 
 The model is trained on ~35 000 colour palettes paired with text descriptions (LLM-generated) and tag-based annotations. Tag-based samples receive 4× sample weight during training.
@@ -134,10 +140,42 @@ additional training.
 
 ---
 
+### Palette Ordering
+
+After diversity enforcement the 5 colours are sorted by Oklab **L** (lightness) in
+ascending order — darkest to lightest:
+
+| Index | Role (Unity convention) |
+|-------|------------------------|
+| 0 | Darkest — shadows, backgrounds |
+| 1 | Dark mid-tone |
+| 2 | Mid-tone |
+| 3 | Light mid-tone |
+| 4 | Lightest — highlights, foreground accents |
+
+This deterministic ordering lets Unity shaders and scripts address palette slots by
+perceived brightness without needing to sort at runtime.
+
+### Inference Temperature
+
+The inference pipeline adds Gaussian noise to the CLIP embedding before each forward
+pass so that repeated calls with the same prompt return perceptibly different palettes:
+
+```python
+T_SCALED = 0.25 / (EMBED_DIM ** 0.5)   # ≈ 0.011  →  ~14° angular deviation
+emb = emb + torch.randn_like(emb) * T_SCALED
+emb = emb / emb.norm(dim=-1, keepdim=True)
+```
+
+Pass `temperature=0.0` to `generate()` to get a deterministic output (used internally
+by `evaluate.py`).
+
+---
+
 ## Results
 
 Evaluated on 9 emotion classes from Russell's circumplex model of affect.
-Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend → enforce_diversity.
+Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend → enforce_diversity → sort_palette_by_luminance.
 
 | Metric | Raw model | After anchor | Target |
 |---|---|---|---|
@@ -146,11 +184,16 @@ Full pipeline: CLIP embedding → Text2PaletteModel → emotional anchor blend �
 | Circumplex Pearson r | 0.281 | **0.719** | > 0.50 |
 | Intra-palette Diversity | 0.352 | 0.176 ¹ | > 0.18 |
 
+> **Note — consistency metric uses `T = 0.05 / √512 ≈ 0.002`** (evaluation temperature).
+> Interactive inference uses the higher default `T = 0.25 / √512 ≈ 0.011`, which gives
+> perceptibly different palettes across runs (~14° angular deviation on the embedding sphere).
+
 ¹ Diversity is partially recovered by `enforce_diversity(min_dist=0.15)` applied as
   the final step in the pipeline. The reduction post-anchor is expected and semantically
   correct — emotionally coherent classes (e.g. *sad and depressed*) naturally produce
   less contrasted palettes.
-
+  
+---
 
   The following image is an example generated on the 9 emotional classes taken into consideration:
   
