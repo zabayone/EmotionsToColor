@@ -59,7 +59,7 @@ Emotional anchor blend    →  circumplex-aligned palette
 enforce_diversity          →  spread colours apart
     │
     ▼
-sort_palette_by_luminance  →  darkest → lightest (Unity-ready)
+sort_palette_by_luminance  →  darkest → lightest
     │
     ▼
 oklab_to_hex               →  final palette (#rrggbb × 5)
@@ -117,8 +117,8 @@ It teaches the model *relative* semantics: the palette for *"happy"* should be c
 to other happy palettes than to sad ones. This improves generalisation to unseen prompts
 without requiring explicit emotion labels during training.
 
-**Sample weighting:** tag-based palettes (ColorHunt) receive 4× weight relative to
-LLM-described palettes (ColorHex), reflecting higher confidence in their semantic labels.
+**Sample weighting:** tag-based palettesreceive 4× weight relative to
+LLM-described palettes, reflecting higher confidence in their semantic labels.
 
 Training runs for 200 epochs with AdamW (lr=3e-4, cosine annealing to 1e-5)
 on ~28 000 training samples. On Apple M1 Max: ~24s/epoch.
@@ -139,7 +139,7 @@ Russell's circumplex model of affect. The blend weight α is tuned per class (0.
 and a global scale factor **s = 0.3** is applied to all weights, giving effective blend
 strengths in the range **0.075–0.18**. This keeps the pipeline predominantly model-based
 while nudging palettes toward the intended affective region instead of replacing the
-model output with anchor-dominated colours. Re-run `evaluate.py` for current metrics.
+model output with anchor-dominated colours. 
 
 The current anchor set was revised to better match the intended colour semantics:
 
@@ -178,10 +178,9 @@ to the palette model.
 This technique compensates for the fact that the model was not trained with emotion
 labels and therefore has no intrinsic concept of which colours map to which affective
 states. The colour hint steers the CLIP embedding toward the correct chromatic zone,
-but because the model itself has not learned emotion-to-colour associations, the hint
+but because the model itself has not learned strong emotion-to-colour associations, the hint
 also reduces embedding variance and therefore palette diversity. The improvements in
-discrimination metrics are largely attributable to this steering, not to the model's
-learned representations.
+discrimination metrics are partially attributable to this steering.
 
 The weight `w` is configurable per call (`color_enrichment_weight` argument to
 `generate()`). For free-form prompts that do not match any emotion class the enriched
@@ -193,16 +192,7 @@ is unchanged from the baseline.
 ### Palette Ordering
 
 After diversity enforcement the 5 colours are sorted by Oklab **L** (lightness) in
-ascending order — darkest to lightest:
-
-| Index | Role (Unity convention) |
-|-------|------------------------|
-| 0 | Darkest — shadows, backgrounds |
-| 1 | Dark mid-tone |
-| 2 | Mid-tone |
-| 3 | Light mid-tone |
-| 4 | Lightest — highlights, foreground accents |
-
+ascending order from darkest to lightest.
 This deterministic ordering lets Unity shaders and scripts address palette slots by
 perceived brightness without needing to sort at runtime.
 
@@ -224,7 +214,7 @@ by `evaluate.py`).
 
 ## Results
 
-Evaluated on 9 emotion classes from Russell's circumplex model of affect.
+Evaluated on the 9 emotion classes from Russell's circumplex model of affect.
 Full pipeline: colour-hint embedding interpolation (`w = 0.25`) → CLIP ViT-B/32 → Text2PaletteModel → emotional anchor blend → enforce_diversity → sort_palette_by_luminance.
 
 Current metrics below were obtained with **emotional anchor scaling** enabled
@@ -291,10 +281,8 @@ Key limitations of the current approach:
   close (`0.0633`) despite being semantically distant in the Russell circumplex. This is a
   structural failure that post-hoc corrections cannot fully resolve.
 
-The most direct path to higher quality would be fine-tuning with explicit emotion supervision
-— for example, a triplet loss that pulls palettes of the same emotion class together and
-pushes palettes of distant classes apart — or training on a purpose-built emotion-annotated
-colour dataset.
+The most direct path to higher quality would be fine-tuning with explicit emotion supervision. 
+The main future improvement planned is to add a third hand-curated dataset with strong correlation between emotions and colors.
   
 ---
 
